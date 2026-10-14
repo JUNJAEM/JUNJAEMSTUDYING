@@ -125,6 +125,27 @@
   .brand-mark svg { width: 24px; height: 24px; }
   .brand h1 { font-family: 'Gaegu', 'Noto Sans KR', sans-serif; font-size: 1.75rem; line-height: 1.05; }
   .brand p { font-size: 0.8rem; color: var(--ink-soft); margin-top: 3px; }
+  .today-card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 10px 22px -18px var(--shadow); }
+  .today-top { display: flex; align-items: flex-start; gap: 12px; }
+  .today-top > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .today-top .kicker { font-size: 0.72rem; font-weight: 700; color: var(--accent); }
+  .today-top h2 { font-size: 1.15rem; font-weight: 900; }
+  .today-top p { font-size: 0.78rem; line-height: 1.5; color: var(--ink-soft); word-break: keep-all; }
+  .dday { font-family: 'Gaegu', 'Noto Sans KR', sans-serif; font-size: 1.9rem; line-height: 1; color: var(--accent); flex-shrink: 0; }
+  .ready { display: flex; flex-direction: column; gap: 7px; }
+  .ready-line { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.82rem; }
+  .ready-line b { font-size: 1.05rem; font-weight: 900; margin-left: 4px; }
+  .segbar { position: relative; display: flex; height: 9px; border-radius: 5px; background: var(--paper-alt); }
+  .segbar i { border-radius: 5px; }
+  .segbar i.k { background: var(--good); }
+  .segbar i.m { background: var(--accent); }
+  .segbar .goal { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.74rem; color: var(--ink-soft); }
+  .legend b { color: var(--ink); font-weight: 700; }
+  .todo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .todo div { background: var(--paper); border-radius: 12px; padding: 10px 6px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
+  .todo b { font-size: 1.2rem; font-weight: 900; }
+  .todo span { font-size: 0.7rem; color: var(--ink-soft); }
   .stat-strip {
     display: grid; grid-template-columns: repeat(3, 1fr);
     background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
@@ -244,7 +265,17 @@
   .chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 13px; font-size: 0.82rem; font-weight: 500; }
   .chip.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
   .chips .spacer { flex: 1; }
+  .chips.scroll { flex-wrap: nowrap; overflow-x: auto; margin-inline: -16px; padding: 2px 16px; scrollbar-width: none; }
+  .chips.scroll::-webkit-scrollbar { display: none; }
+  .chips.scroll .chip { flex-shrink: 0; white-space: nowrap; }
+  .chip .n { opacity: 0.6; margin-left: 4px; }
   .w-list { display: flex; flex-direction: column; gap: 10px; }
+  .w-group { display: flex; flex-direction: column; gap: 10px; }
+  .w-group + .w-group { margin-top: 14px; }
+  .w-group-head { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
+  .w-group-head b { font-size: 0.95rem; flex: 1; min-width: 0; word-break: keep-all; }
+  .w-group-head .num { font-size: 0.8rem; color: var(--ink-soft); font-weight: 500; margin-left: 6px; }
+  .w-group-head .link-btn { flex-shrink: 0; font-size: 0.8rem; }
   .w-item { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
   .w-item.marked { border-color: var(--star); box-shadow: inset 4px 0 0 var(--star); }
   .w-row { display: flex; gap: 4px; align-items: stretch; }
@@ -286,10 +317,27 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
   const QS = STUDY.questions;
   const MARKS = ['①', '②', '③', '④', '⑤'];
   const EXAM_SIZE = 30;
-  const PASS_SCORE = 60;
+  const PASS_SCORE = 80;
   const firstIndexById = new Map();
   QS.forEach((q, i) => { if (!firstIndexById.has(q.id)) firstIndexById.set(q.id, i); });
-  const sheetIndices = SHEETS.map((_, si) => QS.reduce((acc, q, i) => { if (q.s === si) acc.push(i); return acc; }, []));
+  // Each question appears once per sheet, and only in the first category sheet that lists it.
+  // The "비슷하고 헷갈리는거" sheet is a hand-picked collection, so it keeps its copies of category-sheet questions.
+  const COLLECTION_SHEET = SHEETS.findIndex((sh) => sh.name.includes('헷갈'));
+  const sheetIndices = SHEETS.map(() => []);
+  {
+    const takenByCategory = new Set();
+    const seen = SHEETS.map(() => new Set());
+    QS.forEach((q, i) => {
+      if (seen[q.s].has(q.id)) return;
+      if (q.s !== COLLECTION_SHEET) {
+        if (takenByCategory.has(q.id)) return;
+        takenByCategory.add(q.id);
+      }
+      seen[q.s].add(q.id);
+      sheetIndices[q.s].push(i);
+    });
+  }
+  const keptIndex = sheetIndices.map((idx) => new Set(idx));
   const sheetIds = sheetIndices.map((idx) => [...new Set(idx.map((i) => QS[i].id))]);
 
   const I = {
@@ -307,7 +355,7 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
 
   // ---------- storage (this browser only) ----------
   const KEY = 'haeun-study-v1';
-  function emptyStore() { return { stats: {}, wrong: {}, sessions: {}, exams: [] }; }
+  function emptyStore() { return { stats: {}, wrong: {}, sessions: {}, exams: [], srs: {}, day: null }; }
   function loadStore() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
@@ -316,7 +364,56 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
     return emptyStore();
   }
   let store = loadStore();
+  // Sheet sessions saved before duplicates were dropped: keep what was already answered, drop duplicates still ahead.
+  SHEETS.forEach((_, si) => {
+    const ses = store.sessions['s' + si];
+    if (ses && Array.isArray(ses.order)) ses.order = ses.order.slice(0, ses.pos + 1).concat(ses.order.slice(ses.pos + 1).filter((i) => keptIndex[si].has(i)));
+  });
   function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
+
+  // ---------- 오늘의 공부: spaced review (boxes 1–4) paced to the exam date ----------
+  // srs[id] = {b, due}: b 1 = just missed, 2 = right once, 3 = right again on review, 4 = solid. Unseen questions have no entry.
+  const EXAM_DAY = Math.floor(Date.UTC(2026, 9, 30) / 864e5); // 2026-10-30
+  const FIRST_PASS_BUFFER = 4;  // see every question at least once by this many days before the exam
+  const BOX_DAYS = [0, 1, 2, 4, 7];  // days until the next review after landing in box b
+  const BOX_P = [0.4, 0.55, 0.8, 0.92, 0.97];  // rough odds of a right answer per box (0 = unseen), for the score estimate
+  const DAILY_REVIEW_CAP = 150;
+  function dayNum(t) { const d = new Date(t); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5); }
+  function today() { return dayNum(Date.now()); }
+  function fmtDay(n) { const d = new Date(n * 864e5); return (d.getUTCMonth() + 1) + '월 ' + d.getUTCDate() + '일'; }
+  // Questions answered before this feature existed: missed ones come back today, right ones over the next few days.
+  for (const id of Object.keys(store.stats)) {
+    if (store.srs[id] || !firstIndexById.has(id)) continue;
+    const st = store.stats[id];
+    store.srs[id] = store.wrong[id] || !st[0] ? { b: 1, due: today() } : { b: 2, due: today() + 1 + Math.floor(Math.random() * 3) };
+  }
+  function updateSrs(id, correct) {
+    const cur = store.srs[id];
+    const b = correct ? (cur ? Math.min(cur.b + 1, 4) : 2) : 1;
+    store.srs[id] = { b, due: today() + BOX_DAYS[b] };
+  }
+  function unseenIds() { return [...firstIndexById.keys()].filter((id) => !store.srs[id]); }
+  function dueIds() { const t = today(); return Object.keys(store.srs).filter((id) => firstIndexById.has(id) && store.srs[id].due <= t); }
+  // The day's new-question quota is fixed when the day starts, so finishing early doesn't shrink it.
+  function todayPlan() {
+    const t = today();
+    if (!store.day || store.day.d !== t) {
+      const daysLeft = Math.max(1, EXAM_DAY - FIRST_PASS_BUFFER - t + 1);  // today through the first-pass deadline
+      store.day = { d: t, quota: Math.ceil(unseenIds().length / daysLeft), newDone: 0, done: 0, right: 0 };
+      save();
+    }
+    return store.day;
+  }
+  function readiness() {
+    let sum = 0, solid = 0, shaky = 0;
+    for (const id of firstIndexById.keys()) {
+      const s = store.srs[id];
+      sum += BOX_P[s ? s.b : 0];
+      if (s && s.b >= 3) solid++; else if (s) shaky++;
+    }
+    const n = firstIndexById.size;
+    return { score: Math.round((sum / n) * 100), solid, shaky, unseen: n - solid - shaky, n };
+  }
 
   // stats[id] = [right, wrong, lastTime]; wrong[id] = {t, mark}
   function record(q, correct) {
@@ -329,6 +426,11 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
       w.t = Date.now();
       store.wrong[q.id] = w;
     }
+    const day = todayPlan();
+    if (!store.srs[q.id]) day.newDone++;
+    day.done++;
+    if (correct) day.right++;
+    updateSrs(q.id, correct);
   }
   function inWrong(id) { return !!store.wrong[id]; }
   function toggleWrong(id) {
@@ -362,7 +464,7 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
   // ---------- view state ----------
   const $main = document.getElementById('main');
   const $modal = document.getElementById('modalRoot');
-  const state = { view: 'home', deck: null, exam: null, result: null, reviewFilter: 'wrong', wrongFilter: 'all', wrongSort: 'count', open: null };
+  const state = { view: 'home', deck: null, exam: null, result: null, reviewFilter: 'wrong', wrongFilter: 'all', wrongSort: 'count', wrongSheet: -1, open: null };
   let examTimer = null;
 
   // Phone back button returns to the home screen instead of leaving the site mid-quiz.
@@ -418,7 +520,8 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
       : last ? '최근 ' + pct(last.right, last.n) + '점 · 새로 시작' : '30문제 시작하기';
     return (
       '<div class="brand"><span class="brand-mark">' + I.book + '</span><div><h1>해운실무 기출풀이</h1>' +
-      '<p>' + SHEETS.length + '개 시트 · 기출 ' + QS.length.toLocaleString() + '문제</p></div></div>' +
+      '<p>' + SHEETS.length + '개 시트 · 기출 ' + firstIndexById.size.toLocaleString() + '문제</p></div></div>' +
+      renderTodayCard() +
       '<div class="stat-strip">' +
       '<div class="stat"><b class="num">' + ids.length.toLocaleString() + '</b><span>푼 문제</span></div>' +
       '<div class="stat"><b class="num">' + (total ? pct(right, total) + '%' : '-') + '</b><span>정답률</span></div>' +
@@ -441,7 +544,7 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
         return '<button class="sheet-row" data-sheet="' + si + '">' +
           '<span class="name">' + esc(sh.name) + resume + '</span>' +
           '<span class="chev">' + I.chev + '</span>' +
-          '<span class="meta num">' + sh.count + '문제 · ' + p.solved + '/' + p.unique + ' 풀어봄' + (p.answered ? ' · 정답률 ' + p.acc + '%' : '') + '</span>' +
+          '<span class="meta num">' + sheetIndices[si].length + '문제 · ' + p.solved + '/' + p.unique + ' 풀어봄' + (p.answered ? ' · 정답률 ' + p.acc + '%' : '') + '</span>' +
           '<span class="bar"><i style="width:' + pct(p.solved, p.unique) + '%"></i></span>' +
           '</button>';
       }).join('') +
@@ -449,7 +552,42 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
       '<div class="home-foot"><span class="muted">기록은 이 폰 브라우저에 저장돼요</span><button id="resetBtn">기록 초기화</button></div>'
     );
   }
+  function renderTodayCard() {
+    const t = today();
+    const dleft = EXAM_DAY - t;
+    const day = todayPlan();
+    const r = readiness();
+    const due = Math.min(dueIds().length, DAILY_REVIEW_CAP);
+    const fresh = Math.min(Math.max(0, day.quota - day.newDone), r.unseen);
+    const firstPass = t <= EXAM_DAY - FIRST_PASS_BUFFER;
+    const guide = dleft < 0 ? '시험이 끝났어요. 수고 많으셨어요!'
+      : dleft === 0 ? '오늘 시험이에요. ★ 표시한 문제만 가볍게 훑어보세요.'
+      : firstPass ? '매일 새 문제 ' + day.quota + '개 + 복습이면 ' + fmtDay(EXAM_DAY - FIRST_PASS_BUFFER) + '까지 전체 문제를 한 번씩 다 봐요.'
+      : '마무리 기간이에요. 복습을 끝내고 종합평가로 실전 연습하세요.';
+    return '<section class="today-card">' +
+      '<div class="today-top"><div><span class="kicker">오늘의 공부</span><h2>' + (dleft > 0 ? '시험까지 ' + dleft + '일' : dleft === 0 ? '시험 당일' : '시험 끝') + '</h2>' +
+      '<p>' + esc(guide) + '</p></div><span class="dday num">' + (dleft > 0 ? 'D-' + dleft : dleft === 0 ? 'D-DAY' : '') + '</span></div>' +
+      '<div class="ready"><div class="ready-line"><span>예상 점수 <b class="num">약 ' + r.score + '점</b></span><span class="muted">목표 ' + PASS_SCORE + '점</span></div>' +
+      '<div class="segbar"><i class="' + (r.score >= PASS_SCORE ? 'k' : 'm') + '" style="width:' + r.score + '%"></i><span class="goal" style="left:' + PASS_SCORE + '%"></span></div>' +
+      '<div class="legend num"><span>확실히 앎 <b>' + r.solid + '</b></span><span>애매함 <b>' + r.shaky + '</b></span><span>아직 안 봄 <b>' + r.unseen + '</b></span></div></div>' +
+      (dleft >= 0
+        ? '<div class="todo num"><div><b>' + due + '</b><span>복습할 문제</span></div><div><b>' + fresh + '</b><span>새 문제</span></div><div><b>' + day.done + '</b><span>오늘 푼 문제</span></div></div>' +
+          '<button class="btn btn-primary btn-block" id="todayBtn">' + (due + fresh ? '오늘의 공부 시작 · ' + (due + fresh) + '문제' : '오늘 할 일 끝! 종합평가 풀어보기') + '</button>'
+        : '') +
+      '</section>';
+  }
+  function startToday() {
+    const day = todayPlan();
+    const due = shuffle(dueIds()).sort((a, b) => store.srs[a].b - store.srs[b].b).slice(0, DAILY_REVIEW_CAP);
+    const fresh = shuffle(unseenIds()).slice(0, Math.max(0, day.quota - day.newDone));
+    if (!due.length && !fresh.length) { startExamFromHome(); return; }
+    state.deck = newDeck('t', '오늘의 공부', due.concat(fresh).map((id) => firstIndexById.get(id)), false);
+    state.deck.requeued = [];
+    go('practice');
+  }
   function bindHome() {
+    const tb = document.getElementById('todayBtn');
+    if (tb) tb.addEventListener('click', startToday);
     document.getElementById('examCard').addEventListener('click', startExamFromHome);
     document.getElementById('wrongCard').addEventListener('click', () => { state.open = null; go('wrong'); });
     document.querySelectorAll('[data-sheet]').forEach((b) => b.addEventListener('click', () => startSheet(+b.dataset.sheet)));
@@ -480,10 +618,10 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
       ]);
     } else begin();
   }
-  function startWrongDeck(onlyMarked, ids) {
+  function startWrongDeck(onlyMarked, ids, title) {
     const list = (ids || Object.keys(store.wrong)).filter((id) => firstIndexById.has(id) && (!onlyMarked || (store.wrong[id] && store.wrong[id].mark)));
     if (!list.length) return;
-    state.deck = newDeck('w', onlyMarked ? '★ 표시한 문제' : '자주 틀리는 문제', list.map((id) => firstIndexById.get(id)), false);
+    state.deck = newDeck('w', title || (onlyMarked ? '★ 표시한 문제' : '자주 틀리는 문제'), list.map((id) => firstIndexById.get(id)), false);
     go('practice');
   }
 
@@ -530,7 +668,7 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
           '<div class="verdict">' + (ok ? I.check + '정답이에요' : I.x + '틀렸어요') + '</div>' +
           '<p class="answer-line">정답 <b>' + esc(answerText(q)) + '</b></p>' +
           explainBlock(q) +
-          (!ok ? '<p class="answer-line muted">자주 틀리는 문제에 담았어요.</p>' : '') +
+          (!ok ? '<p class="answer-line muted">자주 틀리는 문제에 담았어요.' + (d.requeued && d.requeued.includes(d.order[d.pos]) && d.order.indexOf(d.order[d.pos]) === d.pos ? ' 오늘 세트 끝에 한 번 더 나와요.' : '') + '</p>' : '') +
           '<button class="link-btn" id="wrongToggle">' + I.flag + (inWrong(q.id) ? '자주 틀리는 문제에서 빼기' : '자주 틀리는 문제에 담기') + '</button>' +
           '</div>' +
           '<div class="bottom-bar"><div class="inner"><button class="btn btn-primary" id="nextBtn">' + (last ? '결과 보기' : '다음 문제') + '</button></div></div>'
@@ -555,6 +693,8 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
       const ok = d.chosen === q.a;
       record(q, ok);
       d.done++; if (ok) d.right++;
+      // 오늘의 공부: a missed question comes back once more at the end of today's set.
+      if (!ok && d.requeued && !d.requeued.includes(d.order[d.pos])) { d.requeued.push(d.order[d.pos]); d.order.push(d.order[d.pos]); }
       persistDeck();
       render();
       const fb = document.querySelector('.feedback');
@@ -577,7 +717,10 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
       '<div class="quiz-head"><button class="icon-btn" id="homeBtn" aria-label="처음으로">' + I.back + '</button><div class="title"><b>' + esc(d.title) + '</b><span>다 풀었어요</span></div></div>' +
       '<div class="score-card"><span class="score num">' + pct(d.right, d.done) + '<small>%</small></span>' +
       '<span class="sub num">' + d.done + '문제 중 ' + d.right + '문제 맞힘</span></div>' +
-      '<button class="btn btn-primary btn-block" id="againBtn">다시 섞어서 풀기</button>' +
+      (d.key === 't'
+        ? '<p class="muted" style="text-align:center;font-size:0.86rem">오늘 할 일을 마쳤어요. 틀린 문제는 내일 복습에 다시 나와요.</p>' +
+          '<button class="btn btn-primary btn-block" id="examBtn">종합평가로 실전 연습</button>'
+        : '<button class="btn btn-primary btn-block" id="againBtn">다시 섞어서 풀기</button>') +
       '<button class="btn btn-secondary btn-block" id="toWrongBtn">자주 틀리는 문제 보기</button>' +
       '<button class="btn btn-ghost btn-block" id="homeBtn2">처음으로</button>'
     );
@@ -587,6 +730,8 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
     document.getElementById('homeBtn').addEventListener('click', goHome);
     document.getElementById('homeBtn2').addEventListener('click', goHome);
     document.getElementById('toWrongBtn').addEventListener('click', () => { state.view = 'wrong'; render(); });
+    const eb = document.getElementById('examBtn');
+    if (eb) { eb.addEventListener('click', startExamFromHome); return; }
     document.getElementById('againBtn').addEventListener('click', () => {
       state.deck = newDeck(d.key, d.title, d.order, d.persist);
       persistDeck();
@@ -750,7 +895,7 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
       (showStar ? '<button class="star-btn' + (w && w.mark ? ' on' : '') + '" data-star="' + q.id + '" aria-label="표시">' + I.star + '</button>' : '<span style="width:12px;flex-shrink:0"></span>') +
       '<button class="w-main" data-toggle="' + key + '">' +
       '<span class="qt">' + (num ? num + '. ' : '') + esc(q.q) + '</span>' +
-      '<span class="wm"><span>' + esc(sheetName(q.s)) + (q.n ? ' ' + esc(q.n) + '번' : '') + '</span>' +
+      '<span class="wm"><span>' + (showStar ? (q.n ? esc(q.n) + '번' : '') : esc(sheetName(q.s)) + (q.n ? ' ' + esc(q.n) + '번' : '')) + '</span>' +
       (st[1] ? '<span class="cnt">틀림 ' + st[1] + '회</span>' : '') +
       (mine !== undefined ? (mine === q.a ? '<span style="color:var(--good);font-weight:700">맞힘</span>' : '<span class="cnt">내 답 ' + (mine >= 0 ? MARKS[mine] : '안 품') + '</span>') : '') +
       '</span></button></div>' +
@@ -773,17 +918,45 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
   }
 
   // ---------- 자주 틀리는 문제 ----------
+  // A question shared by several sheets is filed under its first sheet (the same one shown in its meta line).
+  function wrongSheetOf(id) { return QS[firstIndexById.get(id)].s; }
+  const WRONG_SORTS = { count: '많이 틀린 순', recent: '최근 틀린 순', num: '문제 번호순' };
+  // Grouped by sheet (sheet order), then by the chosen sort inside each sheet.
   function wrongItems() {
     let ids = Object.keys(store.wrong).filter((id) => firstIndexById.has(id));
     if (state.wrongFilter === 'marked') ids = ids.filter((id) => store.wrong[id].mark);
+    if (state.wrongSheet >= 0) ids = ids.filter((id) => wrongSheetOf(id) === state.wrongSheet);
     const cnt = (id) => (store.stats[id] || [0, 0])[1];
-    ids.sort((a, b) => state.wrongSort === 'count' ? (cnt(b) - cnt(a)) || (store.wrong[b].t - store.wrong[a].t) : store.wrong[b].t - store.wrong[a].t);
+    const num = (id) => parseInt(QS[firstIndexById.get(id)].n, 10) || 0;
+    const recent = (a, b) => store.wrong[b].t - store.wrong[a].t;
+    const within = {
+      count: (a, b) => (cnt(b) - cnt(a)) || recent(a, b),
+      recent,
+      num: (a, b) => num(a) - num(b),
+    }[state.wrongSort] || recent;
+    ids.sort((a, b) => (wrongSheetOf(a) - wrongSheetOf(b)) || within(a, b));
     return ids;
+  }
+  function wrongGroups(ids) {
+    const groups = [];
+    for (const id of ids) {
+      const s = wrongSheetOf(id);
+      if (!groups.length || groups[groups.length - 1].s !== s) groups.push({ s, ids: [] });
+      groups[groups.length - 1].ids.push(id);
+    }
+    return groups;
   }
   function renderWrong() {
     const all = Object.keys(store.wrong).filter((id) => firstIndexById.has(id));
     const marked = all.filter((id) => store.wrong[id].mark).length;
+    const bySheet = SHEETS.map(() => 0);
+    for (const id of all) if (state.wrongFilter !== 'marked' || store.wrong[id].mark) bySheet[wrongSheetOf(id)]++;
+    if (state.wrongSheet >= 0 && !bySheet[state.wrongSheet]) state.wrongSheet = -1;
     const ids = wrongItems();
+    const groups = wrongGroups(ids);
+    const one = state.wrongSheet >= 0;
+    const scopeIds = one ? all.filter((id) => wrongSheetOf(id) === state.wrongSheet) : all;
+    const sheetMarked = scopeIds.filter((id) => store.wrong[id].mark).length;
     return (
       '<div class="quiz-head"><button class="icon-btn" id="homeBtn" aria-label="처음으로">' + I.back + '</button>' +
       '<div class="title"><b>자주 틀리는 문제</b><span class="num">' + all.length + '문제 · ★ ' + marked + '개 표시</span></div></div>' +
@@ -792,26 +965,42 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
           '<button class="chip' + (state.wrongFilter === 'all' ? ' on' : '') + '" data-wf="all">전체 ' + all.length + '</button>' +
           '<button class="chip' + (state.wrongFilter === 'marked' ? ' on' : '') + '" data-wf="marked">★ 표시 ' + marked + '</button>' +
           '<span class="spacer"></span>' +
-          '<button class="chip" id="sortBtn">' + (state.wrongSort === 'count' ? '많이 틀린 순' : '최근 틀린 순') + '</button></div>' +
+          '<button class="chip" id="sortBtn">' + WRONG_SORTS[state.wrongSort] + '</button></div>' +
+          '<div class="chips scroll">' +
+          '<button class="chip' + (!one ? ' on' : '') + '" data-ws="-1">모든 시트</button>' +
+          SHEETS.map((sh, si) => bySheet[si] ? '<button class="chip' + (state.wrongSheet === si ? ' on' : '') + '" data-ws="' + si + '">' + esc(sh.name) + '<span class="n">' + bySheet[si] + '</span></button>' : '').join('') +
+          '</div>' +
           '<p class="muted" style="font-size:0.8rem">문제 옆 ★을 누르면 표시돼요. 문제를 누르면 보기와 정답이 펼쳐져요.</p>' +
-          '<div class="w-list">' + (ids.length ? ids.map((id) => reviewItem(QS[firstIndexById.get(id)], undefined, 'w' + id)).join('') : '<div class="empty">★ 표시한 문제가 아직 없어요.</div>') + '</div>' +
+          '<div class="w-list">' + (groups.length
+            ? groups.map((g) => '<div class="w-group"><div class="w-group-head"><b>' + esc(sheetName(g.s)) + '<span class="num">' + g.ids.length + '문제</span></b>' +
+                (one ? '' : '<button class="link-btn" data-wsplay="' + g.s + '">이 시트만 풀기' + I.chev + '</button>') + '</div>' +
+                g.ids.map((id) => reviewItem(QS[firstIndexById.get(id)], undefined, 'w' + id)).join('') + '</div>').join('')
+            : '<div class="empty">★ 표시한 문제가 아직 없어요.</div>') + '</div>' +
           '<button class="btn btn-ghost btn-block" id="exportBtn">목록을 엑셀(CSV)로 내보내기</button>' +
           '<div class="bottom-bar"><div class="inner">' +
-          (marked ? '<button class="btn btn-secondary" id="retryMarkedBtn">★ ' + marked + '문제 풀기</button>' : '') +
-          '<button class="btn btn-primary" id="retryAllBtn">' + all.length + '문제 다시 풀기</button></div></div>'
+          (sheetMarked ? '<button class="btn btn-secondary" id="retryMarkedBtn">★ ' + sheetMarked + '문제 풀기</button>' : '') +
+          '<button class="btn btn-primary" id="retryAllBtn">' + scopeIds.length + '문제 다시 풀기</button></div></div>'
         : '<div class="empty">아직 틀린 문제가 없어요.<br>문제를 풀다 틀리면 여기에 자동으로 모여요.</div>')
     );
   }
   function bindWrong() {
     document.getElementById('homeBtn').addEventListener('click', goHome);
     document.querySelectorAll('[data-wf]').forEach((b) => b.addEventListener('click', () => { state.wrongFilter = b.dataset.wf; render(); }));
+    document.querySelectorAll('[data-ws]').forEach((b) => b.addEventListener('click', () => { state.wrongSheet = +b.dataset.ws; state.open = null; render(); }));
     const sort = document.getElementById('sortBtn');
-    if (sort) sort.addEventListener('click', () => { state.wrongSort = state.wrongSort === 'count' ? 'recent' : 'count'; render(); });
+    const order = Object.keys(WRONG_SORTS);
+    if (sort) sort.addEventListener('click', () => { state.wrongSort = order[(order.indexOf(state.wrongSort) + 1) % order.length]; render(); });
     bindReviewItems();
+    const sheetIdsOf = (si) => Object.keys(store.wrong).filter((id) => firstIndexById.has(id) && wrongSheetOf(id) === si);
+    document.querySelectorAll('[data-wsplay]').forEach((b) => b.addEventListener('click', () => {
+      const si = +b.dataset.wsplay;
+      startWrongDeck(state.wrongFilter === 'marked', sheetIdsOf(si), '틀린 문제 · ' + sheetName(si));
+    }));
+    const one = state.wrongSheet >= 0;
     const ra = document.getElementById('retryAllBtn');
-    if (ra) ra.addEventListener('click', () => startWrongDeck(false));
+    if (ra) ra.addEventListener('click', () => one ? startWrongDeck(false, sheetIdsOf(state.wrongSheet), '틀린 문제 · ' + sheetName(state.wrongSheet)) : startWrongDeck(false));
     const rm = document.getElementById('retryMarkedBtn');
-    if (rm) rm.addEventListener('click', () => startWrongDeck(true));
+    if (rm) rm.addEventListener('click', () => one ? startWrongDeck(true, sheetIdsOf(state.wrongSheet), '★ ' + sheetName(state.wrongSheet)) : startWrongDeck(true));
     const exp = document.getElementById('exportBtn');
     if (exp) exp.addEventListener('click', exportWrongCsv);
   }
