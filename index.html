@@ -216,6 +216,9 @@
   .feedback .verdict svg { width: 20px; height: 20px; }
   .feedback.ok .verdict { color: var(--good); }
   .feedback.no .verdict { color: var(--bad); }
+  .feedback.guess .verdict { color: var(--warn); }
+  .feedback.guess { background: var(--warn-bg); border-color: var(--warn-line); }
+  .guess-btn { margin-left: auto; border: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--warn); border-radius: 999px; padding: 6px 13px; font-size: 0.82rem; font-weight: 700; }
   .answer-line { font-size: 0.92rem; line-height: 1.55; }
   .answer-line b { background: linear-gradient(to bottom, transparent 58%, var(--highlight) 58%); color: var(--highlight-ink); }
   .explain { font-size: 0.88rem; line-height: 1.65; color: var(--ink); background: var(--paper-alt); border-radius: 12px; padding: 12px 14px; }
@@ -432,6 +435,17 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
     if (correct) day.right++;
     updateSrs(q.id, correct);
   }
+  // "찍었어요": a lucky right answer is re-filed as a miss so the question keeps coming back.
+  function recordGuess(q) {
+    const st = store.stats[q.id];
+    if (st && st[0] > 0) { st[0]--; st[1]++; }
+    const w = store.wrong[q.id] || { t: 0, mark: 0 };
+    w.t = Date.now();
+    store.wrong[q.id] = w;
+    const day = todayPlan();
+    if (day.right > 0) day.right--;
+    updateSrs(q.id, false);
+  }
   function inWrong(id) { return !!store.wrong[id]; }
   function toggleWrong(id) {
     if (store.wrong[id]) delete store.wrong[id];
@@ -603,7 +617,7 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
   }
   function persistDeck() {
     const d = state.deck;
-    if (d && d.persist) store.sessions[d.key] = { order: d.order, pos: d.pos, right: d.right, done: d.done, chosen: d.chosen };
+    if (d && d.persist) store.sessions[d.key] = { order: d.order, pos: d.pos, right: d.right, done: d.done, chosen: d.chosen, guess: !!d.guess };
     save();
   }
   function startSheet(si) {
@@ -656,7 +670,9 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
     const q = QS[d.order[d.pos]];
     const answered = d.chosen >= 0;
     const ok = answered && d.chosen === q.a;
+    const guessed = ok && d.guess;
     const last = d.pos === d.order.length - 1;
+    const comesBack = d.requeued && d.requeued.includes(d.order[d.pos]) && d.order.indexOf(d.order[d.pos]) === d.pos;
     return (
       '<div class="quiz-head"><button class="icon-btn" id="quitBtn" aria-label="그만 풀기">' + I.close + '</button>' +
       '<div class="title"><b>' + esc(d.title) + '</b><span class="num">' + (d.pos + 1) + ' / ' + d.order.length + (d.done ? ' · 맞힘 ' + d.right + '/' + d.done : '') + '</span></div></div>' +
@@ -664,11 +680,11 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
       '<div class="q-card">' + qMeta(q) + '<p class="q-text">' + esc(q.q) + '</p></div>' +
       renderOptions(q, d.chosen, answered ? 'graded' : 'open') +
       (answered
-        ? '<div class="feedback ' + (ok ? 'ok' : 'no') + '">' +
-          '<div class="verdict">' + (ok ? I.check + '정답이에요' : I.x + '틀렸어요') + '</div>' +
+        ? '<div class="feedback ' + (guessed ? 'guess' : ok ? 'ok' : 'no') + '">' +
+          '<div class="verdict">' + (guessed ? I.flag + '찍어서 맞혔어요' : ok ? I.check + '정답이에요' + '<button class="guess-btn" id="guessBtn">찍었어요</button>' : I.x + '틀렸어요') + '</div>' +
           '<p class="answer-line">정답 <b>' + esc(answerText(q)) + '</b></p>' +
           explainBlock(q) +
-          (!ok ? '<p class="answer-line muted">자주 틀리는 문제에 담았어요.' + (d.requeued && d.requeued.includes(d.order[d.pos]) && d.order.indexOf(d.order[d.pos]) === d.pos ? ' 오늘 세트 끝에 한 번 더 나와요.' : '') + '</p>' : '') +
+          (!ok || guessed ? '<p class="answer-line muted">' + (guessed ? '틀린 문제처럼 다시 나오게 할게요. ' : '') + '자주 틀리는 문제에 담았어요.' + (comesBack ? ' 오늘 세트 끝에 한 번 더 나와요.' : '') + '</p>' : '') +
           '<button class="link-btn" id="wrongToggle">' + I.flag + (inWrong(q.id) ? '자주 틀리는 문제에서 빼기' : '자주 틀리는 문제에 담기') + '</button>' +
           '</div>' +
           '<div class="bottom-bar"><div class="inner"><button class="btn btn-primary" id="nextBtn">' + (last ? '결과 보기' : '다음 문제') + '</button></div></div>'
@@ -681,7 +697,7 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
     // Leaving after answering moves the bookmark past this question, so "이어풀기 n/N" counts finished questions.
     document.getElementById('quitBtn').addEventListener('click', () => {
       if (d.chosen >= 0) {
-        if (d.pos < d.order.length - 1) { d.pos++; d.chosen = -1; }
+        if (d.pos < d.order.length - 1) { d.pos++; d.chosen = -1; d.guess = false; }
         else if (d.persist) { delete store.sessions[d.key]; d.persist = false; }
       }
       persistDeck();
@@ -693,19 +709,33 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
       const ok = d.chosen === q.a;
       record(q, ok);
       d.done++; if (ok) d.right++;
-      // 오늘의 공부: a missed question comes back once more at the end of today's set.
-      if (!ok && d.requeued && !d.requeued.includes(d.order[d.pos])) { d.requeued.push(d.order[d.pos]); d.order.push(d.order[d.pos]); }
+      if (!ok) requeueCurrent();
       persistDeck();
       render();
       const fb = document.querySelector('.feedback');
       if (fb) fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }));
+    // 오늘의 공부: a missed (or guessed) question comes back once more at the end of today's set.
+    function requeueCurrent() {
+      const i = d.order[d.pos];
+      if (d.requeued && !d.requeued.includes(i)) { d.requeued.push(i); d.order.push(i); }
+    }
+    const gb = document.getElementById('guessBtn');
+    if (gb) gb.addEventListener('click', () => {
+      if (d.guess) return;
+      d.guess = true;
+      d.right--;
+      recordGuess(q);
+      requeueCurrent();
+      persistDeck();
+      render();
+    });
     const tg = document.getElementById('wrongToggle');
     if (tg) tg.addEventListener('click', () => { toggleWrong(q.id); render(); });
     const nx = document.getElementById('nextBtn');
     if (nx) nx.addEventListener('click', () => {
       if (d.pos >= d.order.length - 1) { if (d.persist) delete store.sessions[d.key]; save(); state.view = 'done'; render(); window.scrollTo(0, 0); return; }
-      d.pos++; d.chosen = -1;
+      d.pos++; d.chosen = -1; d.guess = false;
       persistDeck();
       render();
       window.scrollTo(0, 0);
