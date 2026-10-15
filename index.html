@@ -191,6 +191,7 @@
   .quiz-head .title span { font-size: 0.78rem; color: var(--ink-soft); }
   .progress { height: 6px; border-radius: 3px; background: var(--paper-alt); overflow: hidden; }
   .progress i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.25s ease; }
+  .progress.retry i { background: var(--warn); }
   .q-card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
   .q-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 0.74rem; color: var(--ink-soft); }
   .q-meta .pill { background: var(--paper-alt); border-radius: 999px; padding: 3px 9px; font-weight: 500; }
@@ -597,6 +598,7 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
     if (!due.length && !fresh.length) { startExamFromHome(); return; }
     state.deck = newDeck('t', '오늘의 공부', due.concat(fresh).map((id) => firstIndexById.get(id)), false);
     state.deck.requeued = [];
+    state.deck.base = state.deck.order.length;  // today's quota; re-asks of missed questions come after it
     go('practice');
   }
   function bindHome() {
@@ -673,10 +675,19 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
     const guessed = ok && d.guess;
     const last = d.pos === d.order.length - 1;
     const comesBack = d.requeued && d.requeued.includes(d.order[d.pos]) && d.order.indexOf(d.order[d.pos]) === d.pos;
+    // 오늘의 공부 keeps the quota fixed in the counter; missed questions are a separate "다시 풀기" round after it.
+    const base = d.base || d.order.length;
+    const extra = d.order.length - base;
+    const inRetry = d.pos >= base;
+    const counter = inRetry
+      ? '다시 풀기 ' + (d.pos - base + 1) + ' / ' + extra
+      : (d.pos + 1) + ' / ' + base + (extra ? ' · 다시 풀기 +' + extra : '') + (d.done ? ' · 맞힘 ' + d.right + '/' + d.done : '');
+    const done = inRetry ? d.pos - base + (answered ? 1 : 0) : d.pos + (answered ? 1 : 0);
+    const nextLabel = last ? '결과 보기' : d.pos === base - 1 && extra ? '틀린 ' + extra + '문제 다시 풀기' : '다음 문제';
     return (
       '<div class="quiz-head"><button class="icon-btn" id="quitBtn" aria-label="그만 풀기">' + I.close + '</button>' +
-      '<div class="title"><b>' + esc(d.title) + '</b><span class="num">' + (d.pos + 1) + ' / ' + d.order.length + (d.done ? ' · 맞힘 ' + d.right + '/' + d.done : '') + '</span></div></div>' +
-      '<div class="progress"><i style="width:' + pct(d.pos + (answered ? 1 : 0), d.order.length) + '%"></i></div>' +
+      '<div class="title"><b>' + esc(d.title) + (inRetry ? ' · 틀린 문제 한 번 더' : '') + '</b><span class="num">' + counter + '</span></div></div>' +
+      '<div class="progress' + (inRetry ? ' retry' : '') + '"><i style="width:' + pct(done, inRetry ? extra : base) + '%"></i></div>' +
       '<div class="q-card">' + qMeta(q) + '<p class="q-text">' + esc(q.q) + '</p></div>' +
       renderOptions(q, d.chosen, answered ? 'graded' : 'open') +
       (answered
@@ -684,10 +695,10 @@ const STUDY = {"sheets":[{"name":"정기선과 부정기선","count":400},{"name
           '<div class="verdict">' + (guessed ? I.flag + '찍어서 맞혔어요' : ok ? I.check + '정답이에요' + '<button class="guess-btn" id="guessBtn">찍었어요</button>' : I.x + '틀렸어요') + '</div>' +
           '<p class="answer-line">정답 <b>' + esc(answerText(q)) + '</b></p>' +
           explainBlock(q) +
-          (!ok || guessed ? '<p class="answer-line muted">' + (guessed ? '틀린 문제처럼 다시 나오게 할게요. ' : '') + '자주 틀리는 문제에 담았어요.' + (comesBack ? ' 오늘 세트 끝에 한 번 더 나와요.' : '') + '</p>' : '') +
+          (!ok || guessed ? '<p class="answer-line muted">' + (guessed ? '틀린 문제처럼 다시 나오게 할게요. ' : '') + '자주 틀리는 문제에 담았어요.' + (comesBack ? ' 오늘 분량을 다 풀고 나서 한 번 더 나와요.' : inRetry ? ' 내일 복습에 다시 나와요.' : '') + '</p>' : '') +
           '<button class="link-btn" id="wrongToggle">' + I.flag + (inWrong(q.id) ? '자주 틀리는 문제에서 빼기' : '자주 틀리는 문제에 담기') + '</button>' +
           '</div>' +
-          '<div class="bottom-bar"><div class="inner"><button class="btn btn-primary" id="nextBtn">' + (last ? '결과 보기' : '다음 문제') + '</button></div></div>'
+          '<div class="bottom-bar"><div class="inner"><button class="btn btn-primary" id="nextBtn">' + nextLabel + '</button></div></div>'
         : '')
     );
   }
